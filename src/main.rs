@@ -404,7 +404,7 @@ impl Mcts {
         if root_indices.is_empty() {
             return None;
         }
-        
+
         let root_index = root_indices[0];
         let root = self.tree.get_node(root_index);
 
@@ -436,6 +436,60 @@ impl Mcts {
     }
 }
 
+fn generate_policy_string(seed: u64, num_iterations: usize, max_depth: usize) -> String {
+    let environment = GridWorld::new();
+    let mut output = String::new();
+
+    for r in 0..environment.rows {
+        for c in 0..environment.cols {
+            let state = State { row: r, col: c };
+
+            // Handle terminal and blocked states
+            if environment.is_terminal(&state) {
+                if state == environment.positive_reward {
+                    output.push_str(" +1 ");
+                } else {
+                    output.push_str(" -1 ");
+                }
+            } else if state == environment.blocked {
+                output.push_str(" XX ");
+            } else {
+                // For valid states, run MCTS to find the best action
+                let cell_seed = seed + (r * environment.cols + c) as u64;
+                let mut mcts = Mcts::new(GridWorld::new(), cell_seed, max_depth);
+
+                mcts.run(&state, num_iterations);
+
+                if let Some(action) = mcts.get_best_action(&state) {
+                    let symbol = match action {
+                        Action::Up => "  ^ ",
+                        Action::Down => "  v ",
+                        Action::Left => "  < ",
+                        Action::Right => "  > ",
+                    };
+                    output.push_str(symbol);
+                } else {
+                    output.push_str("  ? "); // Dead end / no actions
+                }
+            }
+        }
+        output.push('\n');
+    }
+
+    output
+}
+
+fn visualize_policy(seed: u64, num_iterations: usize, max_depth: usize) {
+    println!("\n=== Grid Policy Visualization ===");
+    println!("Legend: [^ v < >] = Best Action, [XX] = Blocked, [+1/-1] = Terminal");
+    println!("---------------------------------");
+    print!(
+        "{}",
+        generate_policy_string(seed, num_iterations, max_depth)
+    );
+    println!("---------------------------------");
+}
+
 // ============================================================================
 // Main Function
 // ============================================================================
@@ -445,22 +499,28 @@ fn main() {
     let environment = GridWorld::new();
     let max_depth = 50;
     let num_iterations = 1000;
-    
+
     let start_state = State { row: 1, col: 0 };
 
     println!("=== Monte-Carlo Tree Search ===");
     println!("Grid World: 4 columns x 3 rows");
-    println!("Starting position: row={}, col={}", start_state.row, start_state.col);
+    println!(
+        "Starting position: row={}, col={}",
+        start_state.row, start_state.col
+    );
     println!("Positive reward: row=0, col=3 (+1.0)");
     println!("Negative reward: row=1, col=3 (-1.0)");
     println!("Blocked cell: row=1, col=1");
-    
+
     // Initial run just to print root stats
     let mut initial_mcts = Mcts::new(GridWorld::new(), seed, max_depth);
     initial_mcts.run(&start_state, num_iterations);
 
     if let Some((visits, avg_reward)) = initial_mcts.get_statistics(&start_state) {
-        println!("\nRoot node - Visits: {}, Average Reward: {:.4}", visits, avg_reward);
+        println!(
+            "\nRoot node - Visits: {}, Average Reward: {:.4}",
+            visits, avg_reward
+        );
     }
 
     // Simulate a full path from start
@@ -471,7 +531,10 @@ fn main() {
     let max_steps = 20;
 
     while steps < max_steps {
-        println!("Step {}: state=({}, {})", steps, current_state.row, current_state.col);
+        println!(
+            "Step {}: state=({}, {})",
+            steps, current_state.row, current_state.col
+        );
 
         if environment.is_terminal(&current_state) {
             let reward = environment.reward(&current_state);
@@ -499,6 +562,7 @@ fn main() {
     }
 
     println!("\n=== MCTS Implementation Complete ===");
+    visualize_policy(seed, num_iterations, max_depth);
 }
 
 #[cfg(test)]
@@ -586,5 +650,59 @@ mod tests {
         // Check that root was created
         let indices = mcts.tree.get_nodes_by_state(&start_state);
         assert!(!indices.is_empty());
+    }
+
+    #[test]
+    fn test_policy_visualization_structure() {
+        // Run with very few iterations just to test the string generation quickly
+        let grid_string = generate_policy_string(12345, 10, 10);
+
+        // Use .lines() instead of .trim_end().split('\n')
+        let lines: Vec<&str> = grid_string.lines().collect();
+
+        // 1. Check dimensions
+        assert_eq!(lines.len(), 3, "Grid should have exactly 3 rows");
+
+        for (i, line) in lines.iter().enumerate() {
+            assert_eq!(
+                line.len(),
+                16,
+                "Row {} should have exactly 16 characters (4 cells * 4 chars)",
+                i
+            );
+        }
+
+        // 2. Extract specific cells (each cell is 4 characters wide)
+        let get_cell = |row: usize, col: usize| -> &str {
+            let start = col * 4;
+            let end = start + 4;
+            &lines[row][start..end]
+        };
+
+        // 3. Check fixed elements based on GridWorld configuration
+        assert_eq!(
+            get_cell(0, 3),
+            " +1 ",
+            "Positive reward missing or in wrong place"
+        );
+        assert_eq!(
+            get_cell(1, 3),
+            " -1 ",
+            "Negative reward missing or in wrong place"
+        );
+        assert_eq!(
+            get_cell(1, 1),
+            " XX ",
+            "Blocked cell missing or in wrong place"
+        );
+
+        // 4. Check that a standard cell contains a valid action symbol
+        let start_cell = get_cell(1, 0);
+        let valid_symbols = ["  ^ ", "  v ", "  < ", "  > ", "  ? "];
+        assert!(
+            valid_symbols.contains(&start_cell),
+            "Standard cell contains invalid symbol: '{}'",
+            start_cell
+        );
     }
 }
