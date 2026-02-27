@@ -12,6 +12,7 @@ clean = "cargo clean"
 test = "cargo test"
 fmt = "cargo fmt"
 lint = { cmd = "cargo clippy", depends-on = ["fmt"] }
+lint-ci = { cmd = "cargo clippy" } # only for CI/CD
 lint-fix = { cmd = "cargo clippy --fix --allow-dirty", depends-on = ["fmt"] }
 doc = "cargo doc"
 doc-open = "cargo doc --open"
