@@ -29,7 +29,7 @@ impl Mcts {
     }
 
     // Selection: traverse tree using UCB1 until we find a node that can be expanded
-    pub fn selection(&self, node_index: usize) -> usize {
+    fn selection(&self, node_index: usize) -> usize {
         let mut current_index = node_index;
         let mut iterations = 0;
 
@@ -72,7 +72,7 @@ impl Mcts {
         }
     }
 
-    pub fn ucb1(&self, node: &mcts::MctsNode, parent_visits: u32) -> f64 {
+    fn ucb1(&self, node: &mcts::MctsNode, parent_visits: u32) -> f64 {
         if node.visit_count == 0 {
             f64::INFINITY
         } else {
@@ -83,7 +83,7 @@ impl Mcts {
         }
     }
 
-    pub fn expansion(&mut self, node_index: usize) -> usize {
+    fn expansion(&mut self, node_index: usize) -> usize {
         let node = self.tree.get_node(node_index).clone();
 
         if node.is_terminal {
@@ -135,7 +135,7 @@ impl Mcts {
     }
 
     // FIXED: Changed to `&mut self`, removed hardcoded RNG, added discount factor
-    pub fn simulation(&mut self, node_index: usize) -> f64 {
+    fn simulation(&mut self, node_index: usize) -> f64 {
         // Clone the state so we don't hold a reference to self.tree
         let mut current_state = self.tree.get_node(node_index).state.clone();
 
@@ -164,7 +164,7 @@ impl Mcts {
         self.environment.reward(&current_state) * gamma.powi(depth as i32)
     }
 
-    pub fn backpropagation(&mut self, node_index: usize, reward: f64) {
+    fn backpropagation(&mut self, node_index: usize, reward: f64) {
         let mut current_index = Some(node_index);
 
         while let Some(idx) = current_index {
@@ -175,7 +175,7 @@ impl Mcts {
         }
     }
 
-    pub fn run_iteration(&mut self, root_index: usize) -> bool {
+    fn run_iteration(&mut self, root_index: usize) -> bool {
         if self.tree.num_nodes() >= MAX_TREE_SIZE {
             return false;
         }
