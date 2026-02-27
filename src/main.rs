@@ -1,18 +1,26 @@
 #![deny(unused_variables)]
 #![deny(unused_imports)]
 
-mod grid_world;
-mod mcts;
-mod search;
+// Import the three modules that make up this project
+mod grid_world; // The environment: GridWorld with states, actions, rewards
+mod mcts; // Core data structures: MctsNode and MctsTree
+mod search; // The MCTS algorithm implementation
 
 fn main() {
+    // Fixed seed for reproducible results across runs
     let seed = 1772163951;
-    let environment = grid_world::GridWorld::new();
-    let max_depth = 50;
-    let num_iterations = 1000;
 
+    // Create the GridWorld environment
+    let environment = grid_world::GridWorld::new();
+
+    // MCTS configuration parameters
+    let max_depth = 50; // Maximum depth for simulation rollouts
+    let num_iterations = 1000; // Number of MCTS iterations per step
+
+    // Starting position in the grid (bottom-left area)
     let start_state = grid_world::State { row: 1, col: 0 };
 
+    // Print header and configuration information
     println!("=== Monte-Carlo Tree Search ===");
     println!("Grid World: 4 columns x 3 rows");
     println!(
@@ -23,10 +31,12 @@ fn main() {
     println!("Negative reward: row=1, col=3 (-1.0)");
     println!("Blocked cell: row=1, col=1");
 
-    // Initial run just to print root stats
+    // Initial run just to print root statistics
+    // Create a fresh MCTS instance for the initial analysis
     let mut initial_mcts = search::Mcts::new(grid_world::GridWorld::new(), seed, max_depth);
     initial_mcts.run(&start_state, num_iterations);
 
+    // Display statistics for the root node (starting position)
     if let Some((visits, avg_reward)) = initial_mcts.get_statistics(&start_state) {
         println!(
             "\nRoot node - Visits: {}, Average Reward: {:.4}",
@@ -34,19 +44,20 @@ fn main() {
         );
     }
 
-    // Simulate a full path from start
-    // FIXED: MCTS is now re-initialized at each step to avoid state aliasing and stale statistics
+    // Simulate a full path from start to a terminal state
     println!("\n=== Simulated Path ===");
     let mut current_state = start_state.clone();
     let mut steps = 0;
-    let max_steps = 20;
+    let max_steps = 20; // Safety limit to prevent infinite loops
 
+    // Main simulation loop: keep taking actions until terminal or max steps
     while steps < max_steps {
         println!(
             "Step {}: state=({}, {})",
             steps, current_state.row, current_state.col
         );
 
+        // Check if we've reached a terminal state (+1 or -1 reward)
         if environment.is_terminal(&current_state) {
             let reward = environment.reward(&current_state);
             println!("Reached terminal state with reward: {}", reward);
@@ -54,11 +65,14 @@ fn main() {
         }
 
         // Re-run MCTS from the current state to guarantee a fresh tree
+        // Using a different seed per step ensures exploration diversity
         let mut step_mcts =
             search::Mcts::new(grid_world::GridWorld::new(), seed + steps as u64, max_depth);
         step_mcts.run(&current_state, num_iterations);
 
+        // Get the best action according to MCTS (most visited child)
         if let Some(action) = step_mcts.get_best_action(&current_state) {
+            // Apply the action to get the next state
             current_state = environment.transition(&current_state, &action);
             println!("  Action taken: {:?}", action);
         } else {
@@ -69,11 +83,14 @@ fn main() {
         steps += 1;
     }
 
+    // Check if we hit the step limit without reaching terminal
     if steps >= max_steps {
         println!("Reached max steps without reaching terminal");
     }
 
     println!("\n=== MCTS Implementation Complete ===");
+
+    // Display a visual map of the learned policy for all grid cells
     search::visualize_policy(seed, num_iterations, max_depth);
 }
 
@@ -85,18 +102,18 @@ mod tests {
     fn test_gridworld_transition() {
         let env = grid_world::GridWorld::new();
 
-        // Test basic movement
+        // Test basic movement from middle-left position
         let state = grid_world::State { row: 1, col: 0 };
 
         // Move right - blocked cell at {1, 1}, so stays in place
         let next = env.transition(&state, &grid_world::Action::Right);
         assert_eq!(next, grid_world::State { row: 1, col: 0 });
 
-        // Move down
+        // Move down - valid move to bottom row
         let next = env.transition(&state, &grid_world::Action::Down);
         assert_eq!(next, grid_world::State { row: 2, col: 0 });
 
-        // Move up
+        // Move up - valid move to top row
         let next = env.transition(&state, &grid_world::Action::Up);
         assert_eq!(next, grid_world::State { row: 0, col: 0 });
     }
@@ -117,15 +134,15 @@ mod tests {
     fn test_gridworld_rewards() {
         let env = grid_world::GridWorld::new();
 
-        // Positive reward
+        // Positive reward at top-right corner
         let positive = grid_world::State { row: 0, col: 3 };
         assert_eq!(env.reward(&positive), 1.0);
 
-        // Negative reward
+        // Negative reward at middle-right
         let negative = grid_world::State { row: 1, col: 3 };
         assert_eq!(env.reward(&negative), -1.0);
 
-        // No reward
+        // No reward at starting position
         let neutral = grid_world::State { row: 0, col: 0 };
         assert_eq!(env.reward(&neutral), 0.0);
     }
@@ -134,6 +151,7 @@ mod tests {
     fn test_gridworld_terminal() {
         let env = grid_world::GridWorld::new();
 
+        // Only the reward states are terminal
         assert!(env.is_terminal(&grid_world::State { row: 0, col: 3 }));
         assert!(env.is_terminal(&grid_world::State { row: 1, col: 3 }));
         assert!(!env.is_terminal(&grid_world::State { row: 0, col: 0 }));
@@ -141,16 +159,19 @@ mod tests {
 
     #[test]
     fn test_mcts_node() {
+        // Test that MctsNode is properly initialized
         let actions = vec![grid_world::Action::Up, grid_world::Action::Down];
         let node = mcts::MctsNode::new(
             grid_world::State { row: 0, col: 0 },
-            None,
+            None, // No parent (root node)
             actions.clone(),
-            false,
+            false, // Not terminal
         );
 
+        // Verify initial statistics are zero
         assert_eq!(node.visit_count, 0);
         assert_eq!(node.total_reward, 0.0);
+        // Verify untried actions are populated
         assert_eq!(node.untried_actions.len(), 2);
     }
 
@@ -177,9 +198,10 @@ mod tests {
         // Use .lines() instead of .trim_end().split('\n')
         let lines: Vec<&str> = grid_string.lines().collect();
 
-        // 1. Check dimensions
+        // 1. Check dimensions - grid should have 3 rows
         assert_eq!(lines.len(), 3, "Grid should have exactly 3 rows");
 
+        // Each row should have 16 characters (4 cells * 4 chars each)
         for (i, line) in lines.iter().enumerate() {
             assert_eq!(
                 line.len(),

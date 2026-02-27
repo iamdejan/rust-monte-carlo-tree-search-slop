@@ -7,7 +7,9 @@
 //! Selection, Expansion, Simulation, and Backpropagation.
 //! It also provides visualization utilities for the learned policy.
 
+// SeedableRng allows creating RNG with a fixed seed for reproducibility
 use rand::SeedableRng;
+// prelude imports common RNG utilities like gen_range
 use rand::prelude::*;
 
 use crate::grid_world;
@@ -84,10 +86,12 @@ impl Mcts {
     /// assert_eq!(mcts.tree.num_nodes(), 0);
     /// ```
     pub fn new(environment: grid_world::GridWorld, seed: u64, max_depth: usize) -> Self {
+        // Initialize MCTS with empty tree, cloned environment, and seeded RNG
         return Mcts {
             tree: mcts::MctsTree::new(),
             environment,
             max_depth,
+            // seed_from_u64 creates a reproducible RNG sequence
             rng: StdRng::seed_from_u64(seed),
         };
     }
@@ -119,16 +123,21 @@ impl Mcts {
     /// assert!(mcts.tree.num_nodes() > 0);
     /// ```
     pub fn run(&mut self, root_state: &grid_world::State, num_iterations: usize) {
+        // Check if a root node already exists for this state
         let root_index = if let Some(idx) = self.tree.get_nodes_by_state(root_state).first() {
+            // Reuse existing root node
             *idx
         } else {
+            // Create new root node with all possible actions
             let actions = self.environment.get_actions(root_state);
             let is_terminal = self.environment.is_terminal(root_state);
             let root_node = mcts::MctsNode::new(root_state.clone(), None, actions, is_terminal);
             self.tree.add_node(root_node)
         };
 
+        // Run the specified number of MCTS iterations
         for i in 0..num_iterations {
+            // Stop early if tree size limit reached
             if !self.run_iteration(root_index) {
                 eprintln!("Warning: Tree size limit reached at iteration {}", i);
                 break;
@@ -169,21 +178,26 @@ impl Mcts {
         &mut self,
         root_state: &grid_world::State,
     ) -> Option<grid_world::Action> {
+        // Find all nodes matching the root state
         let root_indices = self.tree.get_nodes_by_state(root_state);
         if root_indices.is_empty() {
             return None;
         }
 
+        // Use the first matching node as root
         let root_index = root_indices[0];
         let root = self.tree.get_node(root_index);
 
+        // Can't determine best action if root has no children
         if root.children.is_empty() {
             return None;
         }
 
+        // Track the action with highest visit count (most explored = most promising)
         let mut best_action = grid_world::Action::Up;
         let mut best_visits = 0u32;
 
+        // Iterate through all children to find the most visited
         for (action, child_index) in &root.children {
             let child = self.tree.get_node(*child_index);
             if child.visit_count > best_visits {
@@ -222,10 +236,12 @@ impl Mcts {
     /// }
     /// ```
     pub fn get_statistics(&self, state: &grid_world::State) -> Option<(u32, f64)> {
+        // Look up the state in the tree
         let indices = self.tree.get_nodes_by_state(state);
         if indices.is_empty() {
             return None;
         }
+        // Return visit count and average reward for the first matching node
         let node = self.tree.get_node(indices[0]);
         return Some((node.visit_count, node.average_reward()));
     }
@@ -247,6 +263,7 @@ impl Mcts {
         let mut current_index = node_index;
         let mut iterations = 0;
 
+        // Keep traversing until we find a node to expand or hit a terminal
         loop {
             iterations += 1;
             if iterations > 1000 {
@@ -257,6 +274,7 @@ impl Mcts {
             let node = self.tree.get_node(current_index);
 
             // If terminal or not fully expanded, stop selection
+            // Terminal nodes can't be expanded, non-fully-expanded nodes should be expanded
             if node.is_terminal || !node.is_fully_expanded() {
                 return current_index;
             }
@@ -266,17 +284,19 @@ impl Mcts {
             let mut best_value = f64::NEG_INFINITY;
             let parent_visits = node.visit_count;
 
+            // Evaluate all children using UCB1 formula
             for (action, child_index) in &node.children {
                 let child = self.tree.get_node(*child_index);
                 let ucb_value = self.ucb1(child, parent_visits);
 
+                // Keep track of the highest UCB1 value
                 if ucb_value > best_value {
                     best_value = ucb_value;
                     best_action = *action;
                 }
             }
 
-            // Move to best child
+            // Move to best child for next iteration
             if let Some(next_index) = node.get_child_by_action(best_action) {
                 current_index = next_index;
             } else {
@@ -304,10 +324,14 @@ impl Mcts {
     /// - `f64::INFINITY` if the node has never been visited (forces exploration)
     /// - The UCB1 value otherwise
     fn ucb1(&self, node: &mcts::MctsNode, parent_visits: u32) -> f64 {
+        // Unvisited nodes have infinite UCB1 value to ensure they're explored first
         if node.visit_count == 0 {
             return f64::INFINITY;
         } else {
+            // Exploitation term: how good is this node on average?
             let exploitation = node.average_reward();
+            // Exploration term: how uncertain are we about this node?
+            // Nodes with fewer visits get higher exploration bonus
             let exploration = EXPLORATION_CONSTANT
                 * ((parent_visits as f64).ln() / node.visit_count as f64).sqrt();
             return exploitation + exploration;
@@ -329,31 +353,34 @@ impl Mcts {
     /// - The node is terminal
     /// - The tree size limit has been reached
     fn expansion(&mut self, node_index: usize) -> usize {
+        // Clone node to avoid borrow checker issues with mutable refs
         let node = self.tree.get_node(node_index).clone();
 
+        // Terminal nodes can't be expanded
         if node.is_terminal {
             return node_index;
         }
 
-        // Check tree size limit
+        // Check tree size limit to prevent memory issues
         if self.tree.num_nodes() >= MAX_TREE_SIZE {
             return node_index;
         }
 
-        // Select a random untried action
+        // Select a random untried action to explore
         let action_idx = self.rng.gen_range(0..node.untried_actions.len());
         let action = node.untried_actions[action_idx];
 
-        // Remove the selected action from untried
+        // Remove the selected action from untried list (mark it as tried)
         {
             let node_mut = self.tree.get_node_mut(node_index);
             node_mut.untried_actions.remove(action_idx);
         }
 
-        // Create new state
+        // Compute the resulting state after taking this action
         let new_state = self.environment.transition(&node.state, &action);
 
-        // Get actions for new state
+        // Get available actions for the new state
+        // Terminal states have no actions (episode ends there)
         let new_actions = if self.environment.is_terminal(&new_state) {
             Vec::new()
         } else {
@@ -362,17 +389,18 @@ impl Mcts {
 
         let is_terminal = self.environment.is_terminal(&new_state);
 
-        // Create new node
+        // Create the new child node
         let new_node = mcts::MctsNode::new(
             new_state.clone(),
-            Some(node_index),
+            Some(node_index), // Parent is the current node
             new_actions,
             is_terminal,
         );
 
+        // Add the new node to the tree
         let new_index = self.tree.add_node(new_node);
 
-        // Add to parent's children
+        // Add the child to the parent's children list
         let node_mut = self.tree.get_node_mut(node_index);
         node_mut.children.push((action, new_index));
 
@@ -396,6 +424,7 @@ impl Mcts {
         // Clone the state so we don't hold a reference to self.tree
         let mut current_state = self.tree.get_node(node_index).state.clone();
 
+        // If starting from terminal state, just return its reward
         if self.environment.is_terminal(&current_state) {
             return self.environment.reward(&current_state);
         }
@@ -403,14 +432,16 @@ impl Mcts {
         let mut depth = 0;
         let gamma = 0.95_f64; // Discount factor for longer paths
 
+        // Perform random rollout until terminal or max depth
         while depth < self.max_depth && !self.environment.is_terminal(&current_state) {
             let actions = self.environment.get_actions(&current_state);
 
+            // No actions available - end simulation
             if actions.is_empty() {
                 break;
             }
 
-            // Use the instance's RNG, ensuring diverse simulations
+            // Choose random action for exploration
             let idx = self.rng.gen_range(0..actions.len());
             let action = actions[idx];
             current_state = self.environment.transition(&current_state, &action);
@@ -418,6 +449,7 @@ impl Mcts {
         }
 
         // Apply discount factor so the agent prefers shorter paths to the goal
+        // Earlier rewards are better than later rewards
         return self.environment.reward(&current_state) * gamma.powi(depth as i32);
     }
 
@@ -433,10 +465,14 @@ impl Mcts {
     fn backpropagation(&mut self, node_index: usize, reward: f64) {
         let mut current_index = Some(node_index);
 
+        // Walk up the tree from leaf to root
         while let Some(idx) = current_index {
             let node = self.tree.get_node_mut(idx);
+            // Increment visit count for this node
             node.visit_count += 1;
+            // Accumulate the reward from the simulation
             node.total_reward += reward;
+            // Move to parent (None when we reach root, ending the loop)
             current_index = node.parent;
         }
     }
@@ -455,23 +491,32 @@ impl Mcts {
     /// - `true` if the iteration completed successfully
     /// - `false` if the tree size limit was reached
     fn run_iteration(&mut self, root_index: usize) -> bool {
+        // Check tree size limit before starting
         if self.tree.num_nodes() >= MAX_TREE_SIZE {
             return false;
         }
 
+        // Phase 1: Selection - traverse tree to find a node to expand
         let selected_index = self.selection(root_index);
 
+        // Check if selected node is terminal (no expansion needed)
         {
             let node = self.tree.get_node(selected_index);
             if node.is_terminal {
+                // Terminal nodes just get their reward backpropagated
                 let reward = self.environment.reward(&node.state);
                 self.backpropagation(selected_index, reward);
                 return true;
             }
         }
 
+        // Phase 2: Expansion - add a new child node
         let new_index = self.expansion(selected_index);
+
+        // Phase 3: Simulation - random rollout from new node
         let reward = self.simulation(new_index);
+
+        // Phase 4: Backpropagation - update statistics up the tree
         self.backpropagation(new_index, reward);
 
         return true;
@@ -516,11 +561,12 @@ pub fn generate_policy_string(seed: u64, num_iterations: usize, max_depth: usize
     let environment = grid_world::GridWorld::new();
     let mut output = String::new();
 
+    // Iterate through all grid cells
     for r in 0..environment.rows {
         for c in 0..environment.cols {
             let state = grid_world::State { row: r, col: c };
 
-            // Handle terminal and blocked states
+            // Handle terminal and blocked states with fixed symbols
             if environment.is_terminal(&state) {
                 if state == environment.positive_reward {
                     output.push_str(" +1 ");
@@ -531,11 +577,13 @@ pub fn generate_policy_string(seed: u64, num_iterations: usize, max_depth: usize
                 output.push_str(" XX ");
             } else {
                 // For valid states, run MCTS to find the best action
+                // Use unique seed per cell for varied exploration
                 let cell_seed = seed + (r * environment.cols + c) as u64;
                 let mut mcts = Mcts::new(grid_world::GridWorld::new(), cell_seed, max_depth);
 
                 mcts.run(&state, num_iterations);
 
+                // Map the best action to a visual symbol
                 if let Some(action) = mcts.get_best_action(&state) {
                     let symbol = match action {
                         grid_world::Action::Up => "  ^ ",

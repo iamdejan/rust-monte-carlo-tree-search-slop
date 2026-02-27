@@ -1,5 +1,5 @@
 [package]
-name = "rust-monte-carlo-tree-search"
+name = "rust-monte-carlo-tree-search-slop"
 version = "0.1.0"
 edition = "2024"
 

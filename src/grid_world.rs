@@ -25,6 +25,11 @@
 /// assert_eq!(start.row, 1);
 /// assert_eq!(start.col, 0);
 /// ```
+// Derive macros automatically implement these traits:
+// - Clone: allows making copies of State
+// - Debug: enables printing for debugging
+// - PartialEq/Eq: enables equality comparison (== and !=)
+// - Hash: allows using State as a key in HashMap
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct State {
     /// The row index (0-indexed, from top to bottom).
@@ -37,6 +42,7 @@ pub struct State {
 ///
 /// The agent can move in four cardinal directions: Up, Down, Left, and Right.
 /// Movement is constrained by grid boundaries and blocked cells.
+// Copy trait allows the enum to be copied (not moved) when passed to functions
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Action {
     /// Move one cell up (decreases row index).
@@ -69,11 +75,13 @@ impl Action {
     /// assert_eq!(Action::Right.delta(), (0, 1));
     /// ```
     fn delta(&self) -> (i32, i32) {
+        // Use match to return the direction vector for each action
+        // The values are i32 (signed) to allow negative deltas
         match self {
-            Action::Up => return (-1, 0),
-            Action::Down => return (1, 0),
-            Action::Left => return (0, -1),
-            Action::Right => return (0, 1),
+            Action::Up => return (-1, 0),   // Moving up decreases row by 1
+            Action::Down => return (1, 0),  // Moving down increases row by 1
+            Action::Left => return (0, -1), // Moving left decreases col by 1
+            Action::Right => return (0, 1), // Moving right increases col by 1
         }
     }
 }
@@ -136,6 +144,11 @@ impl GridWorld {
     /// assert_eq!(env.cols, 4);
     /// ```
     pub fn new() -> Self {
+        // Initialize the GridWorld with hardcoded dimensions and special positions
+        // Grid layout:
+        // Row 0: [0,0] [0,1] [0,2] [0,3]=+1
+        // Row 1: [1,0] [1,1]=XX [1,2] [1,3]=-1
+        // Row 2: [2,0] [2,1] [2,2] [2,3]
         return GridWorld {
             rows: 3,
             cols: 4,
@@ -173,6 +186,9 @@ impl GridWorld {
     /// assert!(actions.contains(&Action::Right));
     /// ```
     pub fn get_actions(&self, _state: &State) -> Vec<Action> {
+        // Return all four possible movement actions
+        // Note: Even if some actions would hit boundaries, we return all of them
+        // The transition() method handles boundary checking
         return vec![Action::Up, Action::Down, Action::Left, Action::Right];
     }
 
@@ -210,16 +226,23 @@ impl GridWorld {
     /// assert_eq!(next, State { row: 1, col: 0 });
     /// ```
     pub fn transition(&self, state: &State, action: &Action) -> State {
+        // Get the direction vector for this action (e.g., Up = (-1, 0))
         let (dr, dc) = action.delta();
+
+        // Calculate new position by adding delta to current position
+        // Use clamp() to ensure we stay within grid boundaries
+        // Cast to i32 for safe arithmetic (could go negative), then clamp, then cast back
         let new_row = (state.row as i32 + dr).clamp(0, self.rows as i32 - 1) as usize;
         let new_col = (state.col as i32 + dc).clamp(0, self.cols as i32 - 1) as usize;
 
+        // Create the tentative new state
         let new_state = State {
             row: new_row,
             col: new_col,
         };
 
         // If the new state is blocked, go back to the original state
+        // This simulates "bouncing back" when hitting a wall
         if new_state == self.blocked {
             return State {
                 row: state.row,
@@ -257,10 +280,13 @@ impl GridWorld {
     /// assert_eq!(env.reward(&State { row: 0, col: 0 }), 0.0);
     /// ```
     pub fn reward(&self, state: &State) -> f64 {
+        // Check if state matches the positive reward position
         if *state == self.positive_reward {
             return 1.0;
+        // Check if state matches the negative reward position
         } else if *state == self.negative_reward {
             return -1.0;
+        // All other states have no reward
         } else {
             return 0.0;
         }
@@ -295,6 +321,8 @@ impl GridWorld {
     /// assert!(!env.is_terminal(&State { row: 2, col: 2 }));
     /// ```
     pub fn is_terminal(&self, state: &State) -> bool {
+        // A state is terminal if it's either the positive or negative reward state
+        // This means the episode ends when reaching +1 or -1
         return *state == self.positive_reward || *state == self.negative_reward;
     }
 }

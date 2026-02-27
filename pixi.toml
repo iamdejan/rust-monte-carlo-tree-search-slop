@@ -1,7 +1,7 @@
 [workspace]
 authors = ["Giovanni Dejan <giovanni.dejan@binus.ac.id>"]
 channels = ["conda-forge"]
-name = "rust-monte-carlo-tree-search"
+name = "rust-monte-carlo-tree-search-slop"
 platforms = ["linux-64"]
 version = "0.1.0"
 

@@ -6,6 +6,7 @@
 //! This module provides the fundamental data structures for the Monte-Carlo Tree
 //! Search algorithm: the tree node (`MctsNode`) and the tree container (`MctsTree`).
 
+// HashMap is used to map states to node indices for O(1) lookup
 use std::collections::HashMap;
 
 use crate::grid_world;
@@ -96,6 +97,8 @@ impl MctsNode {
         actions: Vec<grid_world::Action>,
         is_terminal: bool,
     ) -> Self {
+        // Initialize a new node with zero statistics
+        // The node starts with all actions untried (will be moved to children as explored)
         return MctsNode {
             state,
             parent,
@@ -133,9 +136,11 @@ impl MctsNode {
     /// assert_eq!(node.average_reward(), 0.5);
     /// ```
     pub fn average_reward(&self) -> f64 {
+        // Avoid division by zero - return 0 for unvisited nodes
         if self.visit_count == 0 {
             return 0.0;
         } else {
+            // Q-value = total accumulated reward / number of visits
             return self.total_reward / self.visit_count as f64;
         }
     }
@@ -168,6 +173,8 @@ impl MctsNode {
     /// assert!(node.is_fully_expanded());
     /// ```
     pub fn is_fully_expanded(&self) -> bool {
+        // A node is fully expanded when there are no more untried actions
+        // This means all its children have been added to the tree
         return self.untried_actions.is_empty();
     }
 
@@ -201,6 +208,8 @@ impl MctsNode {
     /// assert_eq!(node.get_child_by_action(grid_world::Action::Up), None);
     /// ```
     pub fn get_child_by_action(&self, action: grid_world::Action) -> Option<usize> {
+        // Linear search through children to find the one matching the action
+        // Returns the index of the child node in the tree's nodes vector
         for (a, idx) in &self.children {
             if *a == action {
                 return Some(*idx);
@@ -253,6 +262,7 @@ impl MctsTree {
     /// assert_eq!(tree.num_nodes(), 0);
     /// ```
     pub fn new() -> Self {
+        // Initialize empty tree with no nodes and empty state mapping
         return MctsTree {
             nodes: Vec::new(),
             state_to_indices: HashMap::new(),
@@ -285,9 +295,14 @@ impl MctsTree {
     /// assert_eq!(index, 0);
     /// ```
     pub fn add_node(&mut self, node: MctsNode) -> usize {
+        // Get the index where this node will be stored (next available position)
         let index = self.nodes.len();
+        // Clone the state for the hashmap key
         let state = node.state.clone();
+        // Store the node in the vector
         self.nodes.push(node);
+        // Add the index to the state-to-indices map
+        // entry().or_default() gets the vector for this state, creating if needed
         self.state_to_indices.entry(state).or_default().push(index);
         return index;
     }
@@ -306,6 +321,8 @@ impl MctsTree {
     ///
     /// Panics if the index is out of bounds
     pub fn get_node(&self, index: usize) -> &MctsNode {
+        // Return reference to node at given index
+        // This will panic if index >= nodes.len()
         return &self.nodes[index];
     }
 
@@ -323,6 +340,8 @@ impl MctsTree {
     ///
     /// Panics if the index is out of bounds
     pub fn get_node_mut(&mut self, index: usize) -> &mut MctsNode {
+        // Return mutable reference to node at given index
+        // Used when updating visit counts and rewards during backpropagation
         return &mut self.nodes[index];
     }
 
@@ -354,6 +373,9 @@ impl MctsTree {
     /// assert_eq!(indices.len(), 1);
     /// ```
     pub fn get_nodes_by_state(&self, state: &grid_world::State) -> Vec<usize> {
+        // Look up the state in the hashmap
+        // cloned() converts Option<&Vec<usize>> to Option<Vec<usize>>
+        // unwrap_or_default() returns empty vector if state not found
         return self
             .state_to_indices
             .get(state)
@@ -369,6 +391,7 @@ impl MctsTree {
     ///
     /// The number of nodes currently in the tree
     pub fn num_nodes(&self) -> usize {
+        // Simply return the length of the nodes vector
         return self.nodes.len();
     }
 }
