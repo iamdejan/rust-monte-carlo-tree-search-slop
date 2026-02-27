@@ -91,11 +91,11 @@ impl GridWorld {
 }
 
 // ============================================================================
-// Expectimax Tree Node
+// MCTS Tree Node
 // ============================================================================
 
 #[derive(Clone)]
-struct ExpectimaxNode {
+struct MctsNode {
     state: State,
     parent: Option<usize>,
     // Store children as (action, state) -> child_index to handle duplicate states from different actions
@@ -106,9 +106,9 @@ struct ExpectimaxNode {
     is_terminal: bool,
 }
 
-impl ExpectimaxNode {
+impl MctsNode {
     fn new(state: State, parent: Option<usize>, actions: Vec<Action>, is_terminal: bool) -> Self {
-        ExpectimaxNode {
+        MctsNode {
             state,
             parent,
             children: Vec::new(),
@@ -142,24 +142,24 @@ impl ExpectimaxNode {
 }
 
 // ============================================================================
-// Expectimax Tree
+// MCTS Tree
 // ============================================================================
 
-struct ExpectimaxTree {
-    nodes: Vec<ExpectimaxNode>,
+struct MctsTree {
+    nodes: Vec<MctsNode>,
     // Map state to all node indices (there can be multiple nodes for same state from different paths)
     state_to_indices: HashMap<State, Vec<usize>>,
 }
 
-impl ExpectimaxTree {
+impl MctsTree {
     fn new() -> Self {
-        ExpectimaxTree {
+        MctsTree {
             nodes: Vec::new(),
             state_to_indices: HashMap::new(),
         }
     }
 
-    fn add_node(&mut self, node: ExpectimaxNode) -> usize {
+    fn add_node(&mut self, node: MctsNode) -> usize {
         let index = self.nodes.len();
         let state = node.state.clone();
         self.nodes.push(node);
@@ -167,11 +167,11 @@ impl ExpectimaxTree {
         index
     }
 
-    fn get_node(&self, index: usize) -> &ExpectimaxNode {
+    fn get_node(&self, index: usize) -> &MctsNode {
         &self.nodes[index]
     }
 
-    fn get_node_mut(&mut self, index: usize) -> &mut ExpectimaxNode {
+    fn get_node_mut(&mut self, index: usize) -> &mut MctsNode {
         &mut self.nodes[index]
     }
 
@@ -195,7 +195,7 @@ const EXPLORATION_CONSTANT: f64 = 1.414; // sqrt(2)
 const MAX_TREE_SIZE: usize = 10000;
 
 struct Mcts {
-    tree: ExpectimaxTree,
+    tree: MctsTree,
     environment: GridWorld,
     max_depth: usize,
     rng: StdRng,
@@ -204,7 +204,7 @@ struct Mcts {
 impl Mcts {
     fn new(environment: GridWorld, seed: u64, max_depth: usize) -> Self {
         Mcts {
-            tree: ExpectimaxTree::new(),
+            tree: MctsTree::new(),
             environment,
             max_depth,
             rng: StdRng::seed_from_u64(seed),
@@ -255,7 +255,7 @@ impl Mcts {
         }
     }
 
-    fn ucb1(&self, node: &ExpectimaxNode, parent_visits: u32) -> f64 {
+    fn ucb1(&self, node: &MctsNode, parent_visits: u32) -> f64 {
         if node.visit_count == 0 {
             f64::INFINITY
         } else {
@@ -291,9 +291,6 @@ impl Mcts {
         // Create new state
         let new_state = self.environment.transition(&node.state, &action);
 
-        // Check if state already exists in tree - find one that doesn't have this action from current parent
-        // For simplicity, always create a new node (MCTS typically expands once per visit anyway)
-
         // Get actions for new state
         let new_actions = if self.environment.is_terminal(&new_state) {
             Vec::new()
@@ -304,7 +301,7 @@ impl Mcts {
         let is_terminal = self.environment.is_terminal(&new_state);
 
         // Create new node
-        let new_node = ExpectimaxNode::new(
+        let new_node = MctsNode::new(
             new_state.clone(),
             Some(node_index),
             new_actions,
@@ -320,35 +317,34 @@ impl Mcts {
         new_index
     }
 
-    fn simulation(&self, node_index: usize) -> f64 {
-        let node = self.tree.get_node(node_index);
-        let mut current_state = node.state.clone();
+    // FIXED: Changed to `&mut self`, removed hardcoded RNG, added discount factor
+    fn simulation(&mut self, node_index: usize) -> f64 {
+        // Clone the state so we don't hold a reference to self.tree
+        let mut current_state = self.tree.get_node(node_index).state.clone();
 
-        // If starting from a terminal state, return its reward
         if self.environment.is_terminal(&current_state) {
             return self.environment.reward(&current_state);
         }
 
-        // Create a new RNG for simulation with the fixed seed
-        let mut sim_rng = StdRng::seed_from_u64(1772163951);
         let mut depth = 0;
+        let gamma = 0.95_f64; // Discount factor for longer paths
 
-        // Simulate until terminal or max depth
         while depth < self.max_depth && !self.environment.is_terminal(&current_state) {
             let actions = self.environment.get_actions(&current_state);
 
-            // If no valid actions, return current reward
             if actions.is_empty() {
-                return self.environment.reward(&current_state);
+                break;
             }
 
-            let idx = sim_rng.gen_range(0..actions.len());
+            // Use the instance's RNG, ensuring diverse simulations
+            let idx = self.rng.gen_range(0..actions.len());
             let action = actions[idx];
             current_state = self.environment.transition(&current_state, &action);
             depth += 1;
         }
 
-        self.environment.reward(&current_state)
+        // Apply discount factor so the agent prefers shorter paths to the goal
+        self.environment.reward(&current_state) * gamma.powi(depth as i32)
     }
 
     fn backpropagation(&mut self, node_index: usize, reward: f64) {
@@ -363,15 +359,12 @@ impl Mcts {
     }
 
     fn run_iteration(&mut self, root_index: usize) -> bool {
-        // Check tree size
         if self.tree.num_nodes() >= MAX_TREE_SIZE {
             return false;
         }
 
-        // Selection: traverse tree until we find a node to expand
         let selected_index = self.selection(root_index);
 
-        // Check if terminal
         {
             let node = self.tree.get_node(selected_index);
             if node.is_terminal {
@@ -381,52 +374,37 @@ impl Mcts {
             }
         }
 
-        // Expansion: add a new child node
         let new_index = self.expansion(selected_index);
-
-        // Simulation: play out the game randomly
         let reward = self.simulation(new_index);
-
-        // Backpropagation: update all nodes on the path
         self.backpropagation(new_index, reward);
 
         true
     }
 
     fn run(&mut self, root_state: &State, num_iterations: usize) {
-        // Initialize root node if not exists
         let root_index = if let Some(idx) = self.tree.get_nodes_by_state(root_state).first() {
             *idx
         } else {
             let actions = self.environment.get_actions(root_state);
             let is_terminal = self.environment.is_terminal(root_state);
-            let root_node = ExpectimaxNode::new(root_state.clone(), None, actions, is_terminal);
+            let root_node = MctsNode::new(root_state.clone(), None, actions, is_terminal);
             self.tree.add_node(root_node)
         };
 
-        // Run iterations
         for i in 0..num_iterations {
             if !self.run_iteration(root_index) {
                 eprintln!("Warning: Tree size limit reached at iteration {}", i);
                 break;
             }
-            // Print progress every 100 iterations
-            if i > 0 && i % 100 == 0 {
-                eprintln!(
-                    "Iteration {} complete, tree size: {}",
-                    i,
-                    self.tree.num_nodes()
-                );
-            }
         }
     }
 
     fn get_best_action(&mut self, root_state: &State) -> Option<Action> {
-        // Find root node
         let root_indices = self.tree.get_nodes_by_state(root_state);
         if root_indices.is_empty() {
             return None;
         }
+        
         let root_index = root_indices[0];
         let root = self.tree.get_node(root_index);
 
@@ -434,7 +412,6 @@ impl Mcts {
             return None;
         }
 
-        // Select child with highest visit count
         let mut best_action = Action::Up;
         let mut best_visits = 0u32;
 
@@ -464,84 +441,50 @@ impl Mcts {
 // ============================================================================
 
 fn main() {
-    // Create the environment
     let seed = 1772163951;
     let environment = GridWorld::new();
-
-    // Create MCTS
     let max_depth = 50;
     let num_iterations = 1000;
-    let mut mcts = Mcts::new(environment, seed, max_depth);
-
-    // Starting state
+    
     let start_state = State { row: 1, col: 0 };
 
     println!("=== Monte-Carlo Tree Search ===");
     println!("Grid World: 4 columns x 3 rows");
-    println!(
-        "Starting position: row={}, col={}",
-        start_state.row, start_state.col
-    );
+    println!("Starting position: row={}, col={}", start_state.row, start_state.col);
     println!("Positive reward: row=0, col=3 (+1.0)");
     println!("Negative reward: row=1, col=3 (-1.0)");
     println!("Blocked cell: row=1, col=1");
-    println!("\nRunning MCTS with {} iterations...", num_iterations);
+    
+    // Initial run just to print root stats
+    let mut initial_mcts = Mcts::new(GridWorld::new(), seed, max_depth);
+    initial_mcts.run(&start_state, num_iterations);
 
-    // Run MCTS
-    mcts.run(&start_state, num_iterations);
-
-    // Get statistics for root
-    if let Some((visits, avg_reward)) = mcts.get_statistics(&start_state) {
-        println!(
-            "Root node - Visits: {}, Average Reward: {:.4}",
-            visits, avg_reward
-        );
-    }
-
-    // Get best action
-    if let Some(best_action) = mcts.get_best_action(&start_state) {
-        println!("\nBest action from start state: {:?}", best_action);
-
-        // Show child statistics
-        let root_indices = mcts.tree.get_nodes_by_state(&start_state);
-        if !root_indices.is_empty() {
-            let root = mcts.tree.get_node(root_indices[0]);
-
-            println!("\nAll child statistics:");
-            for (action, child_idx) in &root.children {
-                let child = mcts.tree.get_node(*child_idx);
-                println!(
-                    "  Action {:?}: state=({}, {}), visits={}, avg_reward={:.4}",
-                    action,
-                    child.state.row,
-                    child.state.col,
-                    child.visit_count,
-                    child.average_reward()
-                );
-            }
-        }
+    if let Some((visits, avg_reward)) = initial_mcts.get_statistics(&start_state) {
+        println!("\nRoot node - Visits: {}, Average Reward: {:.4}", visits, avg_reward);
     }
 
     // Simulate a full path from start
+    // FIXED: MCTS is now re-initialized at each step to avoid state aliasing and stale statistics
     println!("\n=== Simulated Path ===");
-    let mut current_state = start_state;
+    let mut current_state = start_state.clone();
     let mut steps = 0;
     let max_steps = 20;
 
     while steps < max_steps {
-        println!(
-            "Step {}: state=({}, {})",
-            steps, current_state.row, current_state.col
-        );
+        println!("Step {}: state=({}, {})", steps, current_state.row, current_state.col);
 
-        if mcts.environment.is_terminal(&current_state) {
-            let reward = mcts.environment.reward(&current_state);
+        if environment.is_terminal(&current_state) {
+            let reward = environment.reward(&current_state);
             println!("Reached terminal state with reward: {}", reward);
             break;
         }
 
-        if let Some(action) = mcts.get_best_action(&current_state) {
-            current_state = mcts.environment.transition(&current_state, &action);
+        // Re-run MCTS from the current state to guarantee a fresh tree
+        let mut step_mcts = Mcts::new(GridWorld::new(), seed + steps as u64, max_depth);
+        step_mcts.run(&current_state, num_iterations);
+
+        if let Some(action) = step_mcts.get_best_action(&current_state) {
+            current_state = environment.transition(&current_state, &action);
             println!("  Action taken: {:?}", action);
         } else {
             println!("  No action available (dead end)");
@@ -621,9 +564,9 @@ mod tests {
     }
 
     #[test]
-    fn test_expectimax_node() {
+    fn test_mcts_node() {
         let actions = vec![Action::Up, Action::Down];
-        let node = ExpectimaxNode::new(State { row: 0, col: 0 }, None, actions.clone(), false);
+        let node = MctsNode::new(State { row: 0, col: 0 }, None, actions.clone(), false);
 
         assert_eq!(node.visit_count, 0);
         assert_eq!(node.total_reward, 0.0);
