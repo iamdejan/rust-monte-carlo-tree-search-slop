@@ -1,3 +1,6 @@
+#![deny(unused_variables)]
+#![deny(unused_imports)]
+
 // ============================================================================
 // GridWorld Environment
 // ============================================================================
@@ -19,10 +22,10 @@ pub enum Action {
 impl Action {
     fn delta(&self) -> (i32, i32) {
         match self {
-            Action::Up => (-1, 0),
-            Action::Down => (1, 0),
-            Action::Left => (0, -1),
-            Action::Right => (0, 1),
+            Action::Up => return (-1, 0),
+            Action::Down => return (1, 0),
+            Action::Left => return (0, -1),
+            Action::Right => return (0, 1),
         }
     }
 }
@@ -37,17 +40,17 @@ pub struct GridWorld {
 
 impl GridWorld {
     pub fn new() -> Self {
-        GridWorld {
+        return GridWorld {
             rows: 3,
             cols: 4,
             blocked: State { row: 1, col: 1 },
             positive_reward: State { row: 0, col: 3 },
             negative_reward: State { row: 1, col: 3 },
-        }
+        };
     }
 
     pub fn get_actions(&self, _state: &State) -> Vec<Action> {
-        vec![Action::Up, Action::Down, Action::Left, Action::Right]
+        return vec![Action::Up, Action::Down, Action::Left, Action::Right];
     }
 
     pub fn transition(&self, state: &State, action: &Action) -> State {
@@ -62,26 +65,26 @@ impl GridWorld {
 
         // If the new state is blocked, go back to the original state
         if new_state == self.blocked {
-            State {
+            return State {
                 row: state.row,
                 col: state.col,
-            }
+            };
         } else {
-            new_state
+            return new_state;
         }
     }
 
     pub fn reward(&self, state: &State) -> f64 {
         if *state == self.positive_reward {
-            1.0
+            return 1.0;
         } else if *state == self.negative_reward {
-            -1.0
+            return -1.0;
         } else {
-            0.0
+            return 0.0;
         }
     }
 
     pub fn is_terminal(&self, state: &State) -> bool {
-        *state == self.positive_reward || *state == self.negative_reward
+        return *state == self.positive_reward || *state == self.negative_reward;
     }
 }

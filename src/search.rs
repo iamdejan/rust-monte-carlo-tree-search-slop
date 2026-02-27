@@ -1,3 +1,6 @@
+#![deny(unused_variables)]
+#![deny(unused_imports)]
+
 use rand::SeedableRng;
 use rand::prelude::*;
 
@@ -20,12 +23,12 @@ pub struct Mcts {
 
 impl Mcts {
     pub fn new(environment: grid_world::GridWorld, seed: u64, max_depth: usize) -> Self {
-        Mcts {
+        return Mcts {
             tree: mcts::MctsTree::new(),
             environment,
             max_depth,
             rng: StdRng::seed_from_u64(seed),
-        }
+        };
     }
 
     // Selection: traverse tree using UCB1 until we find a node that can be expanded
@@ -74,12 +77,12 @@ impl Mcts {
 
     fn ucb1(&self, node: &mcts::MctsNode, parent_visits: u32) -> f64 {
         if node.visit_count == 0 {
-            f64::INFINITY
+            return f64::INFINITY;
         } else {
             let exploitation = node.average_reward();
             let exploration = EXPLORATION_CONSTANT
                 * ((parent_visits as f64).ln() / node.visit_count as f64).sqrt();
-            exploitation + exploration
+            return exploitation + exploration;
         }
     }
 
@@ -131,7 +134,7 @@ impl Mcts {
         let node_mut = self.tree.get_node_mut(node_index);
         node_mut.children.push((action, new_index));
 
-        new_index
+        return new_index;
     }
 
     // FIXED: Changed to `&mut self`, removed hardcoded RNG, added discount factor
@@ -161,7 +164,7 @@ impl Mcts {
         }
 
         // Apply discount factor so the agent prefers shorter paths to the goal
-        self.environment.reward(&current_state) * gamma.powi(depth as i32)
+        return self.environment.reward(&current_state) * gamma.powi(depth as i32);
     }
 
     fn backpropagation(&mut self, node_index: usize, reward: f64) {
@@ -195,7 +198,7 @@ impl Mcts {
         let reward = self.simulation(new_index);
         self.backpropagation(new_index, reward);
 
-        true
+        return true;
     }
 
     pub fn run(&mut self, root_state: &grid_world::State, num_iterations: usize) {
@@ -243,7 +246,7 @@ impl Mcts {
             }
         }
 
-        Some(best_action)
+        return Some(best_action);
     }
 
     pub fn get_statistics(&self, state: &grid_world::State) -> Option<(u32, f64)> {
@@ -252,7 +255,7 @@ impl Mcts {
             return None;
         }
         let node = self.tree.get_node(indices[0]);
-        Some((node.visit_count, node.average_reward()))
+        return Some((node.visit_count, node.average_reward()));
     }
 }
 
@@ -296,7 +299,7 @@ pub fn generate_policy_string(seed: u64, num_iterations: usize, max_depth: usize
         output.push('\n');
     }
 
-    output
+    return output;
 }
 
 pub fn visualize_policy(seed: u64, num_iterations: usize, max_depth: usize) {

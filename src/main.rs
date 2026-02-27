@@ -1,3 +1,6 @@
+#![deny(unused_variables)]
+#![deny(unused_imports)]
+
 mod grid_world;
 mod mcts;
 mod search;

@@ -1,3 +1,6 @@
+#![deny(unused_variables)]
+#![deny(unused_imports)]
+
 use std::collections::HashMap;
 
 use crate::grid_world;
@@ -25,7 +28,7 @@ impl MctsNode {
         actions: Vec<grid_world::Action>,
         is_terminal: bool,
     ) -> Self {
-        MctsNode {
+        return MctsNode {
             state,
             parent,
             children: Vec::new(),
@@ -33,19 +36,19 @@ impl MctsNode {
             total_reward: 0.0,
             untried_actions: actions,
             is_terminal,
-        }
+        };
     }
 
     pub fn average_reward(&self) -> f64 {
         if self.visit_count == 0 {
-            0.0
+            return 0.0;
         } else {
-            self.total_reward / self.visit_count as f64
+            return self.total_reward / self.visit_count as f64;
         }
     }
 
     pub fn is_fully_expanded(&self) -> bool {
-        self.untried_actions.is_empty()
+        return self.untried_actions.is_empty();
     }
 
     pub fn get_child_by_action(&self, action: grid_world::Action) -> Option<usize> {
@@ -54,7 +57,7 @@ impl MctsNode {
                 return Some(*idx);
             }
         }
-        None
+        return None;
     }
 }
 
@@ -70,10 +73,10 @@ pub struct MctsTree {
 
 impl MctsTree {
     pub fn new() -> Self {
-        MctsTree {
+        return MctsTree {
             nodes: Vec::new(),
             state_to_indices: HashMap::new(),
-        }
+        };
     }
 
     pub fn add_node(&mut self, node: MctsNode) -> usize {
@@ -81,25 +84,26 @@ impl MctsTree {
         let state = node.state.clone();
         self.nodes.push(node);
         self.state_to_indices.entry(state).or_default().push(index);
-        index
+        return index;
     }
 
     pub fn get_node(&self, index: usize) -> &MctsNode {
-        &self.nodes[index]
+        return &self.nodes[index];
     }
 
     pub fn get_node_mut(&mut self, index: usize) -> &mut MctsNode {
-        &mut self.nodes[index]
+        return &mut self.nodes[index];
     }
 
     pub fn get_nodes_by_state(&self, state: &grid_world::State) -> Vec<usize> {
-        self.state_to_indices
+        return self
+            .state_to_indices
             .get(state)
             .cloned()
-            .unwrap_or_default()
+            .unwrap_or_default();
     }
 
     pub fn num_nodes(&self) -> usize {
-        self.nodes.len()
+        return self.nodes.len();
     }
 }

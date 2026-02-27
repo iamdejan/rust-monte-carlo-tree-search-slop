@@ -3,6 +3,10 @@ name = "rust-monte-carlo-tree-search"
 version = "0.1.0"
 edition = "2024"
 
+[lints.clippy]
+needless_return = "allow"
+implicit_return = "deny"
+
 [dependencies]
 rand = "0.8"
 getrandom = { version = "0.2", features = ["std"] }
