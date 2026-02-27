@@ -13,6 +13,7 @@ test = "cargo test"
 fmt = "cargo fmt"
 lint = { cmd = "cargo clippy", depends-on = ["fmt"] }
 lint-fix = "cargo clippy --fix --allow-dirty"
+doc = "cargo doc"
 
 [dependencies]
 rust = ">=1.93.1,<1.94"
