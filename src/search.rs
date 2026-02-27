@@ -31,6 +31,63 @@ impl Mcts {
         };
     }
 
+    pub fn run(&mut self, root_state: &grid_world::State, num_iterations: usize) {
+        let root_index = if let Some(idx) = self.tree.get_nodes_by_state(root_state).first() {
+            *idx
+        } else {
+            let actions = self.environment.get_actions(root_state);
+            let is_terminal = self.environment.is_terminal(root_state);
+            let root_node = mcts::MctsNode::new(root_state.clone(), None, actions, is_terminal);
+            self.tree.add_node(root_node)
+        };
+
+        for i in 0..num_iterations {
+            if !self.run_iteration(root_index) {
+                eprintln!("Warning: Tree size limit reached at iteration {}", i);
+                break;
+            }
+        }
+    }
+
+    pub fn get_best_action(
+        &mut self,
+        root_state: &grid_world::State,
+    ) -> Option<grid_world::Action> {
+        let root_indices = self.tree.get_nodes_by_state(root_state);
+        if root_indices.is_empty() {
+            return None;
+        }
+
+        let root_index = root_indices[0];
+        let root = self.tree.get_node(root_index);
+
+        if root.children.is_empty() {
+            return None;
+        }
+
+        let mut best_action = grid_world::Action::Up;
+        let mut best_visits = 0u32;
+
+        for (action, child_index) in &root.children {
+            let child = self.tree.get_node(*child_index);
+            if child.visit_count > best_visits {
+                best_visits = child.visit_count;
+                best_action = *action;
+            }
+        }
+
+        return Some(best_action);
+    }
+
+    pub fn get_statistics(&self, state: &grid_world::State) -> Option<(u32, f64)> {
+        let indices = self.tree.get_nodes_by_state(state);
+        if indices.is_empty() {
+            return None;
+        }
+        let node = self.tree.get_node(indices[0]);
+        return Some((node.visit_count, node.average_reward()));
+    }
+
     // Selection: traverse tree using UCB1 until we find a node that can be expanded
     fn selection(&self, node_index: usize) -> usize {
         let mut current_index = node_index;
@@ -199,63 +256,6 @@ impl Mcts {
         self.backpropagation(new_index, reward);
 
         return true;
-    }
-
-    pub fn run(&mut self, root_state: &grid_world::State, num_iterations: usize) {
-        let root_index = if let Some(idx) = self.tree.get_nodes_by_state(root_state).first() {
-            *idx
-        } else {
-            let actions = self.environment.get_actions(root_state);
-            let is_terminal = self.environment.is_terminal(root_state);
-            let root_node = mcts::MctsNode::new(root_state.clone(), None, actions, is_terminal);
-            self.tree.add_node(root_node)
-        };
-
-        for i in 0..num_iterations {
-            if !self.run_iteration(root_index) {
-                eprintln!("Warning: Tree size limit reached at iteration {}", i);
-                break;
-            }
-        }
-    }
-
-    pub fn get_best_action(
-        &mut self,
-        root_state: &grid_world::State,
-    ) -> Option<grid_world::Action> {
-        let root_indices = self.tree.get_nodes_by_state(root_state);
-        if root_indices.is_empty() {
-            return None;
-        }
-
-        let root_index = root_indices[0];
-        let root = self.tree.get_node(root_index);
-
-        if root.children.is_empty() {
-            return None;
-        }
-
-        let mut best_action = grid_world::Action::Up;
-        let mut best_visits = 0u32;
-
-        for (action, child_index) in &root.children {
-            let child = self.tree.get_node(*child_index);
-            if child.visit_count > best_visits {
-                best_visits = child.visit_count;
-                best_action = *action;
-            }
-        }
-
-        return Some(best_action);
-    }
-
-    pub fn get_statistics(&self, state: &grid_world::State) -> Option<(u32, f64)> {
-        let indices = self.tree.get_nodes_by_state(state);
-        if indices.is_empty() {
-            return None;
-        }
-        let node = self.tree.get_node(indices[0]);
-        return Some((node.visit_count, node.average_reward()));
     }
 }
 
