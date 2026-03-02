@@ -164,10 +164,6 @@ impl GridWorld {
     /// of the current state. Boundary checking is handled by the `transition`
     /// method.
     ///
-    /// # Arguments
-    ///
-    /// * `_state` - The current state (unused, as all actions are always available)
-    ///
     /// # Returns
     ///
     /// A vector containing all four actions: `[Up, Down, Left, Right]`
@@ -185,7 +181,7 @@ impl GridWorld {
     /// assert!(actions.contains(&Action::Up));
     /// assert!(actions.contains(&Action::Right));
     /// ```
-    pub fn get_actions(&self, _state: &State) -> Vec<Action> {
+    pub fn get_actions(&self) -> Vec<Action> {
         // Return all four possible movement actions
         // Note: Even if some actions would hit boundaries, we return all of them
         // The transition() method handles boundary checking

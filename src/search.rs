@@ -129,7 +129,7 @@ impl Mcts {
             *idx
         } else {
             // Create new root node with all possible actions
-            let actions = self.environment.get_actions(root_state);
+            let actions = self.environment.get_actions();
             let is_terminal = self.environment.is_terminal(root_state);
             let root_node = mcts::MctsNode::new(root_state.clone(), None, actions, is_terminal);
             self.tree.add_node(root_node)
@@ -384,7 +384,7 @@ impl Mcts {
         let new_actions = if self.environment.is_terminal(&new_state) {
             Vec::new()
         } else {
-            self.environment.get_actions(&new_state)
+            self.environment.get_actions()
         };
 
         let is_terminal = self.environment.is_terminal(&new_state);
@@ -434,7 +434,7 @@ impl Mcts {
 
         // Perform random rollout until terminal or max depth
         while depth < self.max_depth && !self.environment.is_terminal(&current_state) {
-            let actions = self.environment.get_actions(&current_state);
+            let actions = self.environment.get_actions();
 
             // No actions available - end simulation
             if actions.is_empty() {
