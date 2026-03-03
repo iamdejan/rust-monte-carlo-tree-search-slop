@@ -74,7 +74,7 @@ impl Action {
     /// assert_eq!(Action::Up.delta(), (-1, 0));
     /// assert_eq!(Action::Right.delta(), (0, 1));
     /// ```
-    const fn delta(&self) -> (i32, i32) {
+    const fn delta(self) -> (i32, i32) {
         // Use match to return the direction vector for each action
         // The values are i32 (signed) to allow negative deltas
         match self {
@@ -181,7 +181,7 @@ impl GridWorld {
     /// assert!(actions.contains(&Action::Up));
     /// assert!(actions.contains(&Action::Right));
     /// ```
-    pub fn get_actions(&self) -> Vec<Action> {
+    pub fn get_actions() -> Vec<Action> {
         // Return all four possible movement actions
         // Note: Even if some actions would hit boundaries, we return all of them
         // The transition() method handles boundary checking
@@ -221,15 +221,23 @@ impl GridWorld {
     /// let next = env.transition(&state, &Action::Right);
     /// assert_eq!(next, State { row: 1, col: 0 });
     /// ```
-    pub fn transition(&self, state: &State, action: &Action) -> State {
+    pub fn transition(&self, state: &State, action: Action) -> State {
         // Get the direction vector for this action (e.g., Up = (-1, 0))
         let (dr, dc) = action.delta();
 
         // Calculate new position by adding delta to current position
         // Use clamp() to ensure we stay within grid boundaries
         // Cast to i32 for safe arithmetic (could go negative), then clamp, then cast back
-        let new_row = (state.row as i32 + dr).clamp(0, self.rows as i32 - 1) as usize;
-        let new_col = (state.col as i32 + dc).clamp(0, self.cols as i32 - 1) as usize;
+        let new_row = usize::try_from(
+            (i32::try_from(state.row).unwrap_or(i32::MAX) + dr)
+                .clamp(0, i32::try_from(self.rows).unwrap_or(i32::MAX) - 1),
+        )
+        .unwrap_or(0);
+        let new_col = usize::try_from(
+            (i32::try_from(state.col).unwrap_or(i32::MAX) + dc)
+                .clamp(0, i32::try_from(self.cols).unwrap_or(i32::MAX) - 1),
+        )
+        .unwrap_or(0);
 
         // Create the tentative new state
         let new_state = State {
@@ -278,11 +286,12 @@ impl GridWorld {
         // Check if state matches the positive reward position
         if *state == self.positive_reward {
             return 1.0;
-        // Check if state matches the negative reward position
-        } else if *state == self.negative_reward {
-            return -1.0;
-            // All other states have no reward
         }
+        // Check if state matches the negative reward position
+        if *state == self.negative_reward {
+            return -1.0;
+        }
+        // All other states have no reward
         return 0.0;
     }
 

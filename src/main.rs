@@ -8,7 +8,7 @@ mod search; // The MCTS algorithm implementation
 
 fn main() {
     // Fixed seed for reproducible results across runs
-    let seed = 1772163951;
+    let seed = 1_772_163_951;
 
     // Create the GridWorld environment
     let environment = grid_world::GridWorld::new();
@@ -63,14 +63,17 @@ fn main() {
 
         // Re-run MCTS from the current state to guarantee a fresh tree
         // Using a different seed per step ensures exploration diversity
-        let mut step_mcts =
-            search::Mcts::new(grid_world::GridWorld::new(), seed + steps as u64, max_depth);
+        let mut step_mcts = search::Mcts::new(
+            grid_world::GridWorld::new(),
+            seed + u64::try_from(steps).unwrap_or(u64::MAX),
+            max_depth,
+        );
         step_mcts.run(&current_state, num_iterations);
 
         // Get the best action according to MCTS (most visited child)
         if let Some(action) = step_mcts.get_best_action(&current_state) {
             // Apply the action to get the next state
-            current_state = environment.transition(&current_state, &action);
+            current_state = environment.transition(&current_state, action);
             println!("  Action taken: {action:?}");
         } else {
             println!("  No action available (dead end)");
@@ -103,15 +106,15 @@ mod tests {
         let state = grid_world::State { row: 1, col: 0 };
 
         // Move right - blocked cell at {1, 1}, so stays in place
-        let next = env.transition(&state, &grid_world::Action::Right);
+        let next = env.transition(&state, grid_world::Action::Right);
         assert_eq!(next, grid_world::State { row: 1, col: 0 });
 
         // Move down - valid move to bottom row
-        let next = env.transition(&state, &grid_world::Action::Down);
+        let next = env.transition(&state, grid_world::Action::Down);
         assert_eq!(next, grid_world::State { row: 2, col: 0 });
 
         // Move up - valid move to top row
-        let next = env.transition(&state, &grid_world::Action::Up);
+        let next = env.transition(&state, grid_world::Action::Up);
         assert_eq!(next, grid_world::State { row: 0, col: 0 });
     }
 
@@ -121,7 +124,7 @@ mod tests {
 
         // Starting at (1, 0), move right to (1, 1) which is blocked
         let state = grid_world::State { row: 1, col: 0 };
-        let next = env.transition(&state, &grid_world::Action::Right);
+        let next = env.transition(&state, grid_world::Action::Right);
 
         // Should stay at (1, 0) because (1, 1) is blocked
         assert_eq!(next, grid_world::State { row: 1, col: 0 });

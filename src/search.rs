@@ -28,7 +28,7 @@ const EXPLORATION_CONSTANT: f64 = 1.414; // sqrt(2)
 /// Maximum number of nodes allowed in the search tree.
 ///
 /// This limit prevents memory exhaustion during long-running searches.
-const MAX_TREE_SIZE: usize = 10000;
+const MAX_TREE_SIZE: usize = 10_000;
 
 /// The main Monte-Carlo Tree Search interface.
 ///
@@ -129,7 +129,7 @@ impl Mcts {
             *idx
         } else {
             // Create new root node with all possible actions
-            let actions = self.environment.get_actions();
+            let actions = grid_world::GridWorld::get_actions();
             let is_terminal = self.environment.is_terminal(root_state);
             let root_node = mcts::MctsNode::new(root_state.clone(), None, actions, is_terminal);
             self.tree.add_node(root_node)
@@ -287,7 +287,7 @@ impl Mcts {
             // Evaluate all children using UCB1 formula
             for (action, child_index) in &node.children {
                 let child = self.tree.get_node(*child_index);
-                let ucb_value = self.ucb1(child, parent_visits);
+                let ucb_value = Self::ucb1(child, parent_visits);
 
                 // Keep track of the highest UCB1 value
                 if ucb_value > best_value {
@@ -323,19 +323,18 @@ impl Mcts {
     ///
     /// - `f64::INFINITY` if the node has never been visited (forces exploration)
     /// - The UCB1 value otherwise
-    fn ucb1(&self, node: &mcts::MctsNode, parent_visits: u32) -> f64 {
+    fn ucb1(node: &mcts::MctsNode, parent_visits: u32) -> f64 {
         // Unvisited nodes have infinite UCB1 value to ensure they're explored first
         if node.visit_count == 0 {
             return f64::INFINITY;
-        } else {
-            // Exploitation term: how good is this node on average?
-            let exploitation = node.average_reward();
-            // Exploration term: how uncertain are we about this node?
-            // Nodes with fewer visits get higher exploration bonus
-            let exploration = EXPLORATION_CONSTANT
-                * (f64::from(parent_visits).ln() / f64::from(node.visit_count)).sqrt();
-            return exploitation + exploration;
         }
+        // Exploitation term: how good is this node on average?
+        let exploitation = node.average_reward();
+        // Exploration term: how uncertain are we about this node?
+        // Nodes with fewer visits get higher exploration bonus
+        let exploration = EXPLORATION_CONSTANT
+            * (f64::from(parent_visits).ln() / f64::from(node.visit_count)).sqrt();
+        return exploitation + exploration;
     }
 
     /// Expansion phase: add a new child node for an untried action.
@@ -377,14 +376,14 @@ impl Mcts {
         }
 
         // Compute the resulting state after taking this action
-        let new_state = self.environment.transition(&node.state, &action);
+        let new_state = self.environment.transition(&node.state, action);
 
         // Get available actions for the new state
         // Terminal states have no actions (episode ends there)
         let new_actions = if self.environment.is_terminal(&new_state) {
             Vec::new()
         } else {
-            self.environment.get_actions()
+            grid_world::GridWorld::get_actions()
         };
 
         let is_terminal = self.environment.is_terminal(&new_state);
@@ -434,7 +433,7 @@ impl Mcts {
 
         // Perform random rollout until terminal or max depth
         while depth < self.max_depth && !self.environment.is_terminal(&current_state) {
-            let actions = self.environment.get_actions();
+            let actions = grid_world::GridWorld::get_actions();
 
             // No actions available - end simulation
             if actions.is_empty() {
@@ -444,13 +443,14 @@ impl Mcts {
             // Choose random action for exploration
             let idx = self.rng.gen_range(0..actions.len());
             let action = actions[idx];
-            current_state = self.environment.transition(&current_state, &action);
+            current_state = self.environment.transition(&current_state, action);
             depth += 1;
         }
 
         // Apply discount factor so the agent prefers shorter paths to the goal
         // Earlier rewards are better than later rewards
-        return self.environment.reward(&current_state) * gamma.powi(depth as i32);
+        return self.environment.reward(&current_state)
+            * gamma.powi(i32::try_from(depth).unwrap_or(i32::MAX));
     }
 
     /// Backpropagation phase: propagate the reward up the tree.
