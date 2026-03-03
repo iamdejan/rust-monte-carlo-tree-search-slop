@@ -38,10 +38,7 @@ fn main() {
 
     // Display statistics for the root node (starting position)
     if let Some((visits, avg_reward)) = initial_mcts.get_statistics(&start_state) {
-        println!(
-            "\nRoot node - Visits: {}, Average Reward: {:.4}",
-            visits, avg_reward
-        );
+        println!("\nRoot node - Visits: {visits}, Average Reward: {avg_reward:.4}");
     }
 
     // Simulate a full path from start to a terminal state
@@ -60,7 +57,7 @@ fn main() {
         // Check if we've reached a terminal state (+1 or -1 reward)
         if environment.is_terminal(&current_state) {
             let reward = environment.reward(&current_state);
-            println!("Reached terminal state with reward: {}", reward);
+            println!("Reached terminal state with reward: {reward}");
             break;
         }
 
@@ -74,7 +71,7 @@ fn main() {
         if let Some(action) = step_mcts.get_best_action(&current_state) {
             // Apply the action to get the next state
             current_state = environment.transition(&current_state, &action);
-            println!("  Action taken: {:?}", action);
+            println!("  Action taken: {action:?}");
         } else {
             println!("  No action available (dead end)");
             break;

@@ -67,7 +67,7 @@ impl Mcts {
     ///
     /// # Arguments
     ///
-    /// * `environment` - The GridWorld environment to search
+    /// * `environment` - The `GridWorld` environment to search
     /// * `seed` - Seed for the random number generator (enables reproducible runs)
     /// * `max_depth` - Maximum number of steps in a simulation rollout
     ///
@@ -87,7 +87,7 @@ impl Mcts {
     /// ```
     pub fn new(environment: grid_world::GridWorld, seed: u64, max_depth: usize) -> Self {
         // Initialize MCTS with empty tree, cloned environment, and seeded RNG
-        return Mcts {
+        return Self {
             tree: mcts::MctsTree::new(),
             environment,
             max_depth,
@@ -139,7 +139,7 @@ impl Mcts {
         for i in 0..num_iterations {
             // Stop early if tree size limit reached
             if !self.run_iteration(root_index) {
-                eprintln!("Warning: Tree size limit reached at iteration {}", i);
+                eprintln!("Warning: Tree size limit reached at iteration {i}");
                 break;
             }
         }
@@ -333,7 +333,7 @@ impl Mcts {
             // Exploration term: how uncertain are we about this node?
             // Nodes with fewer visits get higher exploration bonus
             let exploration = EXPLORATION_CONSTANT
-                * ((parent_visits as f64).ln() / node.visit_count as f64).sqrt();
+                * (f64::from(parent_visits).ln() / f64::from(node.visit_count)).sqrt();
             return exploitation + exploration;
         }
     }
@@ -391,7 +391,7 @@ impl Mcts {
 
         // Create the new child node
         let new_node = mcts::MctsNode::new(
-            new_state.clone(),
+            new_state,
             Some(node_index), // Parent is the current node
             new_actions,
             is_terminal,

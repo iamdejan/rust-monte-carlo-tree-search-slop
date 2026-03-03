@@ -6,6 +6,8 @@ edition = "2024"
 [lints.clippy]
 needless_return = "allow"
 implicit_return = "deny"
+pedantic = "deny"
+nursery = "deny"
 
 [dependencies]
 rand = "0.8"
