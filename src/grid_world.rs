@@ -1,7 +1,7 @@
 #![deny(unused_variables)]
 #![deny(unused_imports)]
 
-//! GridWorld environment module.
+//! `GridWorld` environment module.
 //!
 //! This module defines a simple grid-based environment where an agent can move
 //! in four directions. The goal is to reach a positive reward while avoiding
@@ -11,7 +11,7 @@
 // GridWorld Environment
 // ============================================================================
 
-/// Represents a position in the GridWorld grid.
+/// Represents a position in the `GridWorld` grid.
 ///
 /// The state is defined by row and column indices (0-indexed).
 /// Row 0 is the top row, and column 0 is the leftmost column.
@@ -38,7 +38,7 @@ pub struct State {
     pub col: usize,
 }
 
-/// Represents the possible movement actions in the GridWorld.
+/// Represents the possible movement actions in the `GridWorld`.
 ///
 /// The agent can move in four cardinal directions: Up, Down, Left, and Right.
 /// Movement is constrained by grid boundaries and blocked cells.
@@ -74,19 +74,19 @@ impl Action {
     /// assert_eq!(Action::Up.delta(), (-1, 0));
     /// assert_eq!(Action::Right.delta(), (0, 1));
     /// ```
-    fn delta(&self) -> (i32, i32) {
+    const fn delta(self) -> (i32, i32) {
         // Use match to return the direction vector for each action
         // The values are i32 (signed) to allow negative deltas
         match self {
-            Action::Up => return (-1, 0),   // Moving up decreases row by 1
-            Action::Down => return (1, 0),  // Moving down increases row by 1
-            Action::Left => return (0, -1), // Moving left decreases col by 1
-            Action::Right => return (0, 1), // Moving right increases col by 1
+            Self::Up => return (-1, 0),   // Moving up decreases row by 1
+            Self::Down => return (1, 0),  // Moving down increases row by 1
+            Self::Left => return (0, -1), // Moving left decreases col by 1
+            Self::Right => return (0, 1), // Moving right increases col by 1
         }
     }
 }
 
-/// The GridWorld environment definition.
+/// The `GridWorld` environment definition.
 ///
 /// This struct defines a 3x4 grid with:
 /// - A blocked cell at position (1, 1)
@@ -123,7 +123,7 @@ pub struct GridWorld {
 }
 
 impl GridWorld {
-    /// Creates a new GridWorld with default configuration.
+    /// Creates a new `GridWorld` with default configuration.
     ///
     /// The default grid is 3 rows × 4 columns with:
     /// - Blocked cell at (1, 1)
@@ -143,13 +143,13 @@ impl GridWorld {
     /// assert_eq!(env.rows, 3);
     /// assert_eq!(env.cols, 4);
     /// ```
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         // Initialize the GridWorld with hardcoded dimensions and special positions
         // Grid layout:
         // Row 0: [0,0] [0,1] [0,2] [0,3]=+1
         // Row 1: [1,0] [1,1]=XX [1,2] [1,3]=-1
         // Row 2: [2,0] [2,1] [2,2] [2,3]
-        return GridWorld {
+        return Self {
             rows: 3,
             cols: 4,
             blocked: State { row: 1, col: 1 },
@@ -181,7 +181,7 @@ impl GridWorld {
     /// assert!(actions.contains(&Action::Up));
     /// assert!(actions.contains(&Action::Right));
     /// ```
-    pub fn get_actions(&self) -> Vec<Action> {
+    pub fn get_actions() -> Vec<Action> {
         // Return all four possible movement actions
         // Note: Even if some actions would hit boundaries, we return all of them
         // The transition() method handles boundary checking
@@ -221,15 +221,23 @@ impl GridWorld {
     /// let next = env.transition(&state, &Action::Right);
     /// assert_eq!(next, State { row: 1, col: 0 });
     /// ```
-    pub fn transition(&self, state: &State, action: &Action) -> State {
+    pub fn transition(&self, state: &State, action: Action) -> State {
         // Get the direction vector for this action (e.g., Up = (-1, 0))
         let (dr, dc) = action.delta();
 
         // Calculate new position by adding delta to current position
         // Use clamp() to ensure we stay within grid boundaries
         // Cast to i32 for safe arithmetic (could go negative), then clamp, then cast back
-        let new_row = (state.row as i32 + dr).clamp(0, self.rows as i32 - 1) as usize;
-        let new_col = (state.col as i32 + dc).clamp(0, self.cols as i32 - 1) as usize;
+        let new_row = usize::try_from(
+            (i32::try_from(state.row).unwrap_or(i32::MAX) + dr)
+                .clamp(0, i32::try_from(self.rows).unwrap_or(i32::MAX) - 1),
+        )
+        .unwrap_or(0);
+        let new_col = usize::try_from(
+            (i32::try_from(state.col).unwrap_or(i32::MAX) + dc)
+                .clamp(0, i32::try_from(self.cols).unwrap_or(i32::MAX) - 1),
+        )
+        .unwrap_or(0);
 
         // Create the tentative new state
         let new_state = State {
@@ -244,9 +252,8 @@ impl GridWorld {
                 row: state.row,
                 col: state.col,
             };
-        } else {
-            return new_state;
         }
+        return new_state;
     }
 
     /// Returns the immediate reward for being in a state.
@@ -279,13 +286,13 @@ impl GridWorld {
         // Check if state matches the positive reward position
         if *state == self.positive_reward {
             return 1.0;
-        // Check if state matches the negative reward position
-        } else if *state == self.negative_reward {
-            return -1.0;
-        // All other states have no reward
-        } else {
-            return 0.0;
         }
+        // Check if state matches the negative reward position
+        if *state == self.negative_reward {
+            return -1.0;
+        }
+        // All other states have no reward
+        return 0.0;
     }
 
     /// Checks if a state is terminal.

@@ -45,7 +45,7 @@ pub struct MctsNode {
     pub state: grid_world::State,
     /// Index of the parent node in the tree (`None` for the root node).
     pub parent: Option<usize>,
-    /// List of child nodes as pairs of (action, child_index).
+    /// List of child nodes as pairs of (action, `child_index`).
     /// Each entry represents a transition to a child state via a specific action.
     pub children: Vec<(grid_world::Action, usize)>,
     /// Number of times this node has been visited during MCTS iterations.
@@ -91,7 +91,7 @@ impl MctsNode {
     /// assert_eq!(node.visit_count, 0);
     /// assert!(!node.is_fully_expanded());
     /// ```
-    pub fn new(
+    pub const fn new(
         state: grid_world::State,
         parent: Option<usize>,
         actions: Vec<grid_world::Action>,
@@ -99,7 +99,7 @@ impl MctsNode {
     ) -> Self {
         // Initialize a new node with zero statistics
         // The node starts with all actions untried (will be moved to children as explored)
-        return MctsNode {
+        return Self {
             state,
             parent,
             children: Vec::new(),
@@ -139,10 +139,9 @@ impl MctsNode {
         // Avoid division by zero - return 0 for unvisited nodes
         if self.visit_count == 0 {
             return 0.0;
-        } else {
-            // Q-value = total accumulated reward / number of visits
-            return self.total_reward / self.visit_count as f64;
         }
+        // Q-value = total accumulated reward / number of visits
+        return self.total_reward / f64::from(self.visit_count);
     }
 
     /// Checks if all possible actions from this state have been tried.
@@ -172,7 +171,7 @@ impl MctsNode {
     /// node.untried_actions.clear();
     /// assert!(node.is_fully_expanded());
     /// ```
-    pub fn is_fully_expanded(&self) -> bool {
+    pub const fn is_fully_expanded(&self) -> bool {
         // A node is fully expanded when there are no more untried actions
         // This means all its children have been added to the tree
         return self.untried_actions.is_empty();
@@ -263,7 +262,7 @@ impl MctsTree {
     /// ```
     pub fn new() -> Self {
         // Initialize empty tree with no nodes and empty state mapping
-        return MctsTree {
+        return Self {
             nodes: Vec::new(),
             state_to_indices: HashMap::new(),
         };
@@ -390,7 +389,7 @@ impl MctsTree {
     /// # Returns
     ///
     /// The number of nodes currently in the tree
-    pub fn num_nodes(&self) -> usize {
+    pub const fn num_nodes(&self) -> usize {
         // Simply return the length of the nodes vector
         return self.nodes.len();
     }
