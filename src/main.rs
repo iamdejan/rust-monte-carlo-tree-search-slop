@@ -3,7 +3,7 @@
 
 // Import the three modules that make up this project
 mod grid_world; // The environment: GridWorld with states, actions, rewards
-mod mcts; // Core data structures: MctsNode and MctsTree
+mod mcts; // Core data structures for Monte-Carlo Tree Search: Node and Tree
 mod search; // The MCTS algorithm implementation
 
 fn main() {
@@ -159,9 +159,9 @@ mod tests {
 
     #[test]
     fn test_mcts_node() {
-        // Test that MctsNode is properly initialized
+        // Test that mcts::Node is properly initialized
         let actions = vec![grid_world::Action::Up, grid_world::Action::Down];
-        let node = mcts::MctsNode::new(
+        let node = mcts::Node::new(
             grid_world::State { row: 0, col: 0 },
             None, // No parent (root node)
             actions.clone(),

@@ -4,7 +4,7 @@
 //! Core MCTS data structures module.
 //!
 //! This module provides the fundamental data structures for the Monte-Carlo Tree
-//! Search algorithm: the tree node (`MctsNode`) and the tree container (`MctsTree`).
+//! Search algorithm: the tree node (`Node`) and the tree container (`Tree`).
 
 // HashMap is used to map states to node indices for O(1) lookup
 use std::collections::HashMap;
@@ -34,13 +34,13 @@ use crate::grid_world;
 /// let state = grid_world::State { row: 0, col: 0 };
 /// let actions = vec![grid_world::Action::Up, grid_world::Action::Right];
 ///
-/// let node = mcts::MctsNode::new(state, None, actions, false);
+/// let node = mcts::Node::new(state, None, actions, false);
 ///
 /// assert_eq!(node.visit_count, 0);
 /// assert_eq!(node.total_reward, 0.0);
 /// ```
 #[derive(Clone)]
-pub struct MctsNode {
+pub struct Node {
     /// The environment state this node represents.
     pub state: grid_world::State,
     /// Index of the parent node in the tree (`None` for the root node).
@@ -59,7 +59,7 @@ pub struct MctsNode {
     pub is_terminal: bool,
 }
 
-impl MctsNode {
+impl Node {
     /// Creates a new MCTS node.
     ///
     /// # Arguments
@@ -86,7 +86,7 @@ impl MctsNode {
     /// let parent = Some(0); // Parent at index 0
     /// let actions = vec![grid_world::Action::Up, grid_world::Action::Down];
     ///
-    /// let node = mcts::MctsNode::new(state, parent, actions, false);
+    /// let node = mcts::Node::new(state, parent, actions, false);
     ///
     /// assert_eq!(node.visit_count, 0);
     /// assert!(!node.is_fully_expanded());
@@ -125,7 +125,7 @@ impl MctsNode {
     /// use rust_monte_carlo_tree_search::{grid_world, mcts};
     ///
     /// let state = grid_world::State { row: 0, col: 0 };
-    /// let mut node = mcts::MctsNode::new(state, None, vec![], false);
+    /// let mut node = mcts::Node::new(state, None, vec![], false);
     ///
     /// // Initially, average reward is 0
     /// assert_eq!(node.average_reward(), 0.0);
@@ -162,7 +162,7 @@ impl MctsNode {
     /// let state = grid_world::State { row: 0, col: 0 };
     /// let actions = vec![grid_world::Action::Up];
     ///
-    /// let mut node = mcts::MctsNode::new(state, None, actions, false);
+    /// let mut node = mcts::Node::new(state, None, actions, false);
     ///
     /// // Initially not fully expanded
     /// assert!(!node.is_fully_expanded());
@@ -197,7 +197,7 @@ impl MctsNode {
     /// use rust_monte_carlo_tree_search::{grid_world, mcts};
     ///
     /// let state = grid_world::State { row: 0, col: 0 };
-    /// let mut node = mcts::MctsNode::new(state, None, vec![], false);
+    /// let mut node = mcts::Node::new(state, None, vec![], false);
     ///
     /// // Add a child
     /// node.children.push((grid_world::Action::Right, 5));
@@ -224,7 +224,7 @@ impl MctsNode {
 
 /// Manages a collection of MCTS nodes.
 ///
-/// `MctsTree` stores all nodes in a vector and maintains a mapping from states
+/// `Tree` stores all nodes in a vector and maintains a mapping from states
 /// to node indices for efficient lookup. This allows the same state to appear
 /// multiple times in the tree (reached via different paths).
 ///
@@ -233,29 +233,29 @@ impl MctsNode {
 /// ```
 /// use rust_monte_carlo_tree_search::{grid_world, mcts};
 ///
-/// let mut tree = mcts::MctsTree::new();
+/// let mut tree = MctsTree::new();
 /// let state = grid_world::State { row: 0, col: 0 };
-/// let node = mcts::MctsNode::new(state, None, vec![], false);
+/// let node = mcts::Node::new(state, None, vec![], false);
 ///
 /// let index = tree.add_node(node);
 /// assert_eq!(tree.num_nodes(), 1);
 /// ```
-pub struct MctsTree {
+pub struct Tree {
     /// Storage for all nodes in the tree, indexed by their position.
-    nodes: Vec<MctsNode>,
+    nodes: Vec<Node>,
     /// Maps states to all node indices representing that state.
     /// Multiple indices are possible since the same state can be reached
     /// through different action sequences.
     state_to_indices: HashMap<grid_world::State, Vec<usize>>,
 }
 
-impl MctsTree {
+impl Tree {
     /// Creates an empty MCTS tree.
     ///
     /// # Examples
     ///
     /// ```
-    /// use rust_monte_carlo_tree_search::mcts::MctsTree;
+    /// use rust_monte_carlo_tree_search::mcts::Tree;
     ///
     /// let tree = MctsTree::new();
     /// assert_eq!(tree.num_nodes(), 0);
@@ -286,14 +286,14 @@ impl MctsTree {
     /// ```
     /// use rust_monte_carlo_tree_search::{grid_world, mcts};
     ///
-    /// let mut tree = mcts::MctsTree::new();
+    /// let mut tree = mcts::Tree::new();
     /// let state = grid_world::State { row: 0, col: 0 };
-    /// let node = mcts::MctsNode::new(state, None, vec![], false);
+    /// let node = mcts::Node::new(state, None, vec![], false);
     ///
     /// let index = tree.add_node(node);
     /// assert_eq!(index, 0);
     /// ```
-    pub fn add_node(&mut self, node: MctsNode) -> usize {
+    pub fn add_node(&mut self, node: Node) -> usize {
         // Get the index where this node will be stored (next available position)
         let index = self.nodes.len();
         // Clone the state for the hashmap key
@@ -319,7 +319,7 @@ impl MctsTree {
     /// # Panics
     ///
     /// Panics if the index is out of bounds
-    pub fn get_node(&self, index: usize) -> &MctsNode {
+    pub fn get_node(&self, index: usize) -> &Node {
         // Return reference to node at given index
         // This will panic if index >= nodes.len()
         return &self.nodes[index];
@@ -338,7 +338,7 @@ impl MctsTree {
     /// # Panics
     ///
     /// Panics if the index is out of bounds
-    pub fn get_node_mut(&mut self, index: usize) -> &mut MctsNode {
+    pub fn get_node_mut(&mut self, index: usize) -> &mut Node {
         // Return mutable reference to node at given index
         // Used when updating visit counts and rewards during backpropagation
         return &mut self.nodes[index];
@@ -362,9 +362,9 @@ impl MctsTree {
     /// ```
     /// use rust_monte_carlo_tree_search::{grid_world, mcts};
     ///
-    /// let mut tree = mcts::MctsTree::new();
+    /// let mut tree = mcts::Tree::new();
     /// let state = grid_world::State { row: 0, col: 0 };
-    /// let node = mcts::MctsNode::new(state.clone(), None, vec![], false);
+    /// let node = mcts::Node::new(state.clone(), None, vec![], false);
     ///
     /// tree.add_node(node);
     ///

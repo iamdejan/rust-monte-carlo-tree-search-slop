@@ -53,7 +53,7 @@ const MAX_TREE_SIZE: usize = 10_000;
 /// ```
 pub struct Mcts {
     /// The search tree containing all nodes.
-    pub tree: mcts::MctsTree,
+    pub tree: mcts::Tree,
     /// The environment being searched.
     environment: grid_world::GridWorld,
     /// Maximum depth for simulation rollouts.
@@ -88,7 +88,7 @@ impl Mcts {
     pub fn new(environment: grid_world::GridWorld, seed: u64, max_depth: usize) -> Self {
         // Initialize MCTS with empty tree, cloned environment, and seeded RNG
         return Self {
-            tree: mcts::MctsTree::new(),
+            tree: mcts::Tree::new(),
             environment,
             max_depth,
             // seed_from_u64 creates a reproducible RNG sequence
@@ -131,7 +131,7 @@ impl Mcts {
             // Create new root node with all possible actions
             let actions = grid_world::GridWorld::get_actions();
             let is_terminal = self.environment.is_terminal(root_state);
-            let root_node = mcts::MctsNode::new(root_state.clone(), None, actions, is_terminal);
+            let root_node = mcts::Node::new(root_state.clone(), None, actions, is_terminal);
             self.tree.add_node(root_node)
         };
 
@@ -323,7 +323,7 @@ impl Mcts {
     ///
     /// - `f64::INFINITY` if the node has never been visited (forces exploration)
     /// - The UCB1 value otherwise
-    fn ucb1(node: &mcts::MctsNode, parent_visits: u32) -> f64 {
+    fn ucb1(node: &mcts::Node, parent_visits: u32) -> f64 {
         // Unvisited nodes have infinite UCB1 value to ensure they're explored first
         if node.visit_count == 0 {
             return f64::INFINITY;
@@ -388,7 +388,7 @@ impl Mcts {
         };
 
         // Create the new child node
-        let new_node = mcts::MctsNode::new(
+        let new_node = mcts::Node::new(
             new_state,
             Some(node_index), // Parent is the current node
             new_actions,
