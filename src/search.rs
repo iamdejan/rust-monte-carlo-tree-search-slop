@@ -380,13 +380,12 @@ impl Mcts {
 
         // Get available actions for the new state
         // Terminal states have no actions (episode ends there)
-        let new_actions = if self.environment.is_terminal(&new_state) {
+        let is_terminal = self.environment.is_terminal(&new_state);
+        let new_actions = if is_terminal {
             Vec::new()
         } else {
             grid_world::GridWorld::get_actions()
         };
-
-        let is_terminal = self.environment.is_terminal(&new_state);
 
         // Create the new child node
         let new_node = mcts::MctsNode::new(
